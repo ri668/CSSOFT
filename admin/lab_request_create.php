@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: dashboard.php');
@@ -28,7 +29,7 @@ if ($patientId <= 0 || $consultation === '' || $tests === '' || !preg_match('/^.
     exit;
 }
 
-$patientStmt = $pdo->prepare("SELECT id FROM patients WHERE id = ?");
+$patientStmt = $pdo->prepare("SELECT id FROM patients WHERE id = ? AND archived_at IS NULL");
 $patientStmt->execute([$patientId]);
 if (!$patientStmt->fetch()) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Patient record not found.'];
@@ -41,6 +42,7 @@ $stmt = $pdo->prepare(
 );
 $stmt->execute([$patientId, $consultation, $tests, $requestedBy]);
 $requestId = (int)$pdo->lastInsertId();
+audit_log($pdo, 'create_lab_request', 'lab_request', $requestId, 'Created laboratory request');
 
 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Laboratory request saved. Review it before printing.'];
 header('Location: lab_request.php?id=' . $requestId);

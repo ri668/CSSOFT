@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 $page_title = 'Add New Record';
 $errors = [];
@@ -50,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $form['admission_date'] ?: null,
             $form['notes'],
         ]);
+        audit_log($pdo, 'create_patient', 'patient', (int)$pdo->lastInsertId(), 'Created patient record');
 
         $_SESSION['flash'] = ['type' => 'success', 'message' => 'Patient record created successfully.'];
         header('Location: dashboard.php');

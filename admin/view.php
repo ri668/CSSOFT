@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 $page_title = 'View Record';
 
@@ -14,6 +15,7 @@ if (!$p) {
     header('Location: dashboard.php');
     exit;
 }
+audit_log($pdo, 'view_patient', 'patient', $id, 'Viewed patient record');
 
 $historyStmt = $pdo->prepare("SELECT * FROM patient_history WHERE patient_id = ? ORDER BY changed_at DESC, id DESC");
 $historyStmt->execute([$id]);
@@ -22,7 +24,7 @@ $historyRows = $historyStmt->fetchAll();
 $labStmt = $pdo->prepare("SELECT * FROM lab_requests WHERE patient_id = ? ORDER BY requested_at DESC, id DESC");
 $labStmt->execute([$id]);
 $labRequests = $labStmt->fetchAll();
-$accountId = (int)$_SESSION['admin_id'];
+$accountId = (int)$_SESSION['staff_account_id'];
 
 $appointmentStmt = $pdo->prepare("SELECT * FROM appointments WHERE patient_id = ? AND account_id = ? ORDER BY starts_at DESC");
 $appointmentStmt->execute([$id, $accountId]);
@@ -31,13 +33,14 @@ $appointments = $appointmentStmt->fetchAll();
 $certificateStmt = $pdo->prepare("SELECT id, examination_date, purpose, issued_at FROM medical_certificates WHERE patient_id = ? AND account_id = ? ORDER BY issued_at DESC");
 $certificateStmt->execute([$id, $accountId]);
 $certificates = $certificateStmt->fetchAll();
+$isArchived = $p['archived_at'] !== null;
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $consultation = trim(implode("\n", array_filter([$p['diagnosis'], $p['notes']])));
 $appointmentReason = trim(implode(' - ', array_filter([$p['diagnosis'], $p['notes']])));
-$requestedBy = trim($p['doctor_name'] ?: ($_SESSION['admin_username'] ?? ''));
+$requestedBy = trim($p['doctor_name'] ?: ($_SESSION['staff_name'] ?? ''));
 $minimumAppointmentDate = (new DateTime())->format('Y-m-d\\TH:i');
 $nameParts = preg_split('/\s+/', trim($p['full_name']));
 $initials = strtoupper(substr($nameParts[0] ?? '', 0, 1) . substr($nameParts[count($nameParts) - 1] ?? '', 0, 1));
@@ -66,10 +69,14 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="edit.php?id=<?= (int)$p['id'] ?>" class="btn btn-primary">Edit patient</a>
+            <?php if (!$isArchived): ?><a href="edit.php?id=<?= (int)$p['id'] ?>" class="btn btn-primary">Edit patient</a><?php endif; ?>
+            <?php if ($isArchived): ?>
+                <form method="POST" action="archive.php" class="d-inline"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="action" value="restore"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>"><button type="submit" class="btn btn-success">Restore patient</button></form>
+            <?php endif; ?>
             <a href="dashboard.php" class="btn btn-outline-secondary">Back to patients</a>
         </div>
     </div>
+    <?php if ($isArchived): ?><div class="alert alert-warning mt-3 mb-0">This patient record is archived and is read-only until restored.</div><?php endif; ?>
 </div>
 
 <nav class="d-flex gap-2 flex-wrap mb-4" aria-label="Patient record sections">

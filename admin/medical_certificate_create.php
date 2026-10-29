@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: dashboard.php');
@@ -56,7 +57,7 @@ if (
     exit;
 }
 
-$patientStmt = $pdo->prepare("SELECT id FROM patients WHERE id = ?");
+$patientStmt = $pdo->prepare("SELECT id FROM patients WHERE id = ? AND archived_at IS NULL");
 $patientStmt->execute([$patientId]);
 if (!$patientStmt->fetch()) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Patient record not found.'];
@@ -72,7 +73,7 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([
     $patientId,
-    (int)$_SESSION['admin_id'],
+    (int)$_SESSION['staff_account_id'],
     $examinationDate,
     $purpose,
     $findings,
@@ -82,6 +83,8 @@ $stmt->execute([
     $clinicianName,
     $licenseNumber !== '' ? $licenseNumber : null,
 ]);
+$certificateId = (int)$pdo->lastInsertId();
+audit_log($pdo, 'create_medical_certificate', 'medical_certificate', $certificateId, 'Created medical certificate');
 
 header('Location: medical_certificate.php?id=' . (int)$pdo->lastInsertId());
 exit;

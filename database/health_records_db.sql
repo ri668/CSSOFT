@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS patients (
     doctor_name VARCHAR(100),
     admission_date DATE,
     notes TEXT,
+    archived_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -139,4 +140,36 @@ CREATE TABLE IF NOT EXISTS doctor_availability (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_doctor_availability_user FOREIGN KEY (doctor_id)
         REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Tamper-evident audit trail for authorized clinic staff activity
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    actor_id INT NULL,
+    actor_name VARCHAR(100) NOT NULL,
+    actor_role VARCHAR(30) NOT NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id INT NULL,
+    details TEXT NULL,
+    occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_occurred (occurred_at),
+    INDEX idx_audit_actor (actor_name, actor_role),
+    INDEX idx_audit_entity (entity_type, entity_id),
+    INDEX idx_audit_action (action)
+);
+
+-- Registered document hashes. chain_hash links each registration to the prior entry.
+CREATE TABLE IF NOT EXISTS blockchain_documents (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NULL,
+    document_name VARCHAR(150) NOT NULL,
+    document_hash CHAR(64) NOT NULL,
+    chain_hash CHAR(64) NOT NULL,
+    registered_by VARCHAR(100) NOT NULL,
+    registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_document_hash (document_hash),
+    INDEX idx_blockchain_patient (patient_id),
+    CONSTRAINT fk_blockchain_patient FOREIGN KEY (patient_id)
+        REFERENCES patients(id) ON DELETE SET NULL
 );

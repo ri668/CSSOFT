@@ -7,14 +7,18 @@ $page_title = 'Dashboard';
 $search = trim($_GET['search'] ?? '');
 
 if ($search !== '') {
-    $stmt = $pdo->prepare("SELECT * FROM patients WHERE full_name LIKE ? OR contact_number LIKE ? OR CAST(id AS CHAR) LIKE ? ORDER BY created_at DESC");
+    $stmt = $pdo->prepare("SELECT * FROM patients WHERE archived_at IS NULL AND (full_name LIKE ? OR contact_number LIKE ? OR CAST(id AS CHAR) LIKE ?) ORDER BY created_at DESC");
     $like = '%' . $search . '%';
     $stmt->execute([$like, $like, $like]);
 } else {
-    $stmt = $pdo->query("SELECT * FROM patients ORDER BY created_at DESC");
+    $stmt = $pdo->query("SELECT * FROM patients WHERE archived_at IS NULL ORDER BY created_at DESC");
 }
 $patients = $stmt->fetchAll();
-$patientCount = (int)$pdo->query("SELECT COUNT(*) FROM patients")->fetchColumn();
+$patientCount = (int)$pdo->query("SELECT COUNT(*) FROM patients WHERE archived_at IS NULL")->fetchColumn();
+$archivedCount = (int)$pdo->query("SELECT COUNT(*) FROM patients WHERE archived_at IS NOT NULL")->fetchColumn();
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -28,7 +32,10 @@ include __DIR__ . '/includes/header.php';
         <h1 class="h2 mb-1">Patient records</h1>
         <p class="text-muted mb-0">A clear overview of your patients and their care records.</p>
     </div>
-    <a href="create.php" class="btn btn-success px-4">+ Add patient</a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="old_records.php" class="btn btn-outline-secondary">View old records<?= $archivedCount ? ' (' . $archivedCount . ')' : '' ?></a>
+        <a href="create.php" class="btn btn-success px-4">+ Add patient</a>
+    </div>
 </div>
 
 <?php if ($flash): ?>
@@ -104,8 +111,12 @@ include __DIR__ . '/includes/header.php';
                         <td class="text-end">
                             <a href="view.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-primary">View record</a>
                             <a href="edit.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                            <a href="delete.php?id=<?= $p['id'] ?>" class="btn btn-sm btn-outline-danger"
-                               onclick="return confirm('Delete this record for <?= htmlspecialchars(addslashes($p['full_name'])) ?>? This cannot be undone.');">Delete</a>
+                            <form method="POST" action="archive.php" class="d-inline" onsubmit="return confirm('Archive the record for <?= htmlspecialchars(addslashes($p['full_name'])) ?>? It will remain available in old records.');">
+                                <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                                <input type="hidden" name="action" value="archive">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-warning">Archive</button>
+                            </form>
                         </td>
                     </tr>
                     <?php endforeach; ?>

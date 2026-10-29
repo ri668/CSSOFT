@@ -20,7 +20,7 @@ $stmt = $pdo->prepare("
     WHERE a.account_id = ? AND a.starts_at >= ? AND a.starts_at < ?
     ORDER BY a.starts_at ASC
 ");
-$stmt->execute([(int)$_SESSION['admin_id'], $monthStart, $monthEnd]);
+$stmt->execute([(int)$_SESSION['staff_account_id'], $monthStart, $monthEnd]);
 $appointments = $stmt->fetchAll();
 $byDay = [];
 foreach ($appointments as $appointment) {

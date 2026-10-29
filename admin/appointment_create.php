@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: dashboard.php');
@@ -41,7 +42,7 @@ if (
     exit;
 }
 
-$patientStmt = $pdo->prepare("SELECT id FROM patients WHERE id = ?");
+$patientStmt = $pdo->prepare("SELECT id FROM patients WHERE id = ? AND archived_at IS NULL");
 $patientStmt->execute([$patientId]);
 if (!$patientStmt->fetch()) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Patient record not found.'];
@@ -58,7 +59,7 @@ $conflictStmt = $pdo->prepare("
       AND DATE_ADD(starts_at, INTERVAL duration_minutes MINUTE) > ?
     LIMIT 1
 ");
-$conflictStmt->execute([(int)$_SESSION['admin_id'], $endValue, $startValue]);
+$conflictStmt->execute([(int)$_SESSION['staff_account_id'], $endValue, $startValue]);
 if ($conflictStmt->fetch()) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'This time overlaps another appointment on your calendar.'];
     header('Location: ' . $returnUrl);
@@ -71,12 +72,14 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([
     $patientId,
-    (int)$_SESSION['admin_id'],
+    (int)$_SESSION['staff_account_id'],
     $startValue,
     $duration,
     $type,
     $reason,
 ]);
+$appointmentId = (int)$pdo->lastInsertId();
+audit_log($pdo, 'create_appointment', 'appointment', $appointmentId, 'Created patient appointment');
 
 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Appointment added to your calendar.'];
 header('Location: calendar.php?month=' . $start->format('Y-m'));

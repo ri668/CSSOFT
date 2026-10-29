@@ -5,9 +5,9 @@ require_once __DIR__ . '/../config/database.php';
 $id = (int)($_GET['id'] ?? 0);
 
 if ($id > 0) {
-    $stmt = $pdo->prepare("DELETE FROM patients WHERE id = ?");
-    $stmt->execute([$id]);
-    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Patient record deleted.'];
+    $stmt = $pdo->prepare("UPDATE patients SET archived_at = ? WHERE id = ?");
+    $stmt->execute([date('Y-m-d H:i:s'), $id]);
+    $_SESSION['flash'] = ['type' => 'success', 'message' => 'Patient record archived.'];
 } else {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Invalid record.'];
 }

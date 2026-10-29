@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 $page_title = 'Create User';
 $errors = [];
+$canAssignRoles = in_array($_SESSION['staff_role'] ?? '', ['Admin', 'Doctor'], true);
 
 $form = [
     'full_name' => '',
@@ -17,6 +19,9 @@ $form = [
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($form as $key => $default) {
         $form[$key] = trim($_POST[$key] ?? '');
+    }
+    if (!$canAssignRoles) {
+        $form['role'] = 'User';
     }
 
     if ($form['full_name'] === '') {
@@ -51,8 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Password must be at least 6 characters long.';
     }
 
-    if ($form['role'] === '') {
-        $errors[] = 'Role is required.';
+    if ($canAssignRoles && !in_array($form['role'], ['User', 'Doctor', 'Admin'], true)) {
+        $errors[] = 'Select a valid account role.';
     }
 
     if ($form['status'] === '') {
@@ -73,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $form['role'],
             $form['status'],
         ]);
+        audit_log($pdo, 'create_user', 'user', (int)$pdo->lastInsertId(), 'Created ' . $form['role'] . ' account');
 
         $_SESSION['flash'] = ['type' => 'success', 'message' => 'User created successfully.'];
         header('Location: users.php');
@@ -114,11 +120,15 @@ include __DIR__ . '/includes/header.php';
             </div>
             <div class="col-md-2">
                 <label class="form-label">Role</label>
-                <select name="role" class="form-select">
+                <?php if (!$canAssignRoles): ?><input type="hidden" name="role" value="User"><?php endif; ?>
+                <select name="role" class="form-select" <?= $canAssignRoles ? '' : 'disabled' ?>>
                     <option value="User" <?= $form['role'] === 'User' ? 'selected' : '' ?>>User</option>
-                    <option value="Admin" <?= $form['role'] === 'Admin' ? 'selected' : '' ?>>Admin</option>
-                    <option value="Doctor" <?= $form['role'] === 'Doctor' ? 'selected' : '' ?>>Doctor</option>
+                    <?php if ($canAssignRoles): ?>
+                        <option value="Admin" <?= $form['role'] === 'Admin' ? 'selected' : '' ?>>Admin</option>
+                        <option value="Doctor" <?= $form['role'] === 'Doctor' ? 'selected' : '' ?>>Doctor</option>
+                    <?php endif; ?>
                 </select>
+                <?php if (!$canAssignRoles): ?><div class="form-text">Only authorized staff can assign account roles.</div><?php endif; ?>
             </div>
             <div class="col-md-2">
                 <label class="form-label">Status</label>

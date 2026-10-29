@@ -9,7 +9,7 @@ $stmt = $pdo->prepare("
     INNER JOIN patients p ON p.id = c.patient_id
     WHERE c.id = ? AND c.account_id = ?
 ");
-$stmt->execute([$certificateId, (int)$_SESSION['admin_id']]);
+$stmt->execute([$certificateId, (int)$_SESSION['staff_account_id']]);
 $certificate = $stmt->fetch();
 
 if (!$certificate) {

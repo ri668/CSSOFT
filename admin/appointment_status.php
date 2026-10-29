@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: calendar.php');
@@ -27,7 +28,8 @@ $stmt = $pdo->prepare("
     UPDATE appointments SET status = ?
     WHERE id = ? AND account_id = ? AND status = 'Scheduled'
 ");
-$stmt->execute([$status, $appointmentId, (int)$_SESSION['admin_id']]);
+$stmt->execute([$status, $appointmentId, (int)$_SESSION['staff_account_id']]);
+audit_log($pdo, 'update_appointment_status', 'appointment', $appointmentId, 'Changed appointment status to ' . $status);
 $_SESSION['flash'] = $stmt->rowCount()
     ? ['type' => 'success', 'message' => 'Appointment marked ' . strtolower($status) . '.']
     : ['type' => 'warning', 'message' => 'That appointment could not be updated.'];

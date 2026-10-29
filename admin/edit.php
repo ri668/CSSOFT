@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 $page_title = 'Edit Record';
 $errors = [];
@@ -20,6 +21,11 @@ $form = $original;
 if (!$form) {
     $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Record not found.'];
     header('Location: dashboard.php');
+    exit;
+}
+if ($form['archived_at'] !== null) {
+    $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Archived records are read-only. Restore the record before editing it.'];
+    header('Location: view.php?id=' . $id);
     exit;
 }
 
@@ -50,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $historyStmt->execute([
                 $id,
                 $snapshot,
-                substr($_SESSION['admin_username'] ?? 'admin', 0, 50),
+                substr($_SESSION['staff_name'] ?? 'staff', 0, 50),
             ]);
             $updateStmt->execute([
                 $form['full_name'], $form['date_of_birth'], $form['gender'], $form['contact_number'],
@@ -59,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $form['notes'], $id,
             ]);
             $pdo->commit();
+            audit_log($pdo, 'update_patient', 'patient', $id, 'Updated patient record');
         } catch (Throwable $e) {
             $pdo->rollBack();
             throw $e;

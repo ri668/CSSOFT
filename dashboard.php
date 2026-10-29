@@ -19,7 +19,7 @@ $initials = strtoupper(substr($nameParts[0] ?? '', 0, 1) . substr($nameParts[cou
 $linkStmt = $pdo->prepare("
     SELECT p.* FROM patient_accounts pa
     INNER JOIN patients p ON p.id = pa.patient_id
-    WHERE pa.user_id = ?
+    WHERE pa.user_id = ? AND p.archived_at IS NULL
 ");
 $linkStmt->execute([$userId]);
 $patient = $linkStmt->fetch();

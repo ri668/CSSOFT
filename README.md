@@ -3,8 +3,13 @@
 A PHP + MySQL (PDO) admin panel for managing patient health records, built for XAMPP.
 
 ## Features
-- Admin login (session-based, bcrypt-hashed password)
+- Shared login page for Admin, Doctor, and patient accounts (session-based, bcrypt-hashed passwords)
+- Doctor accounts can use the administrative patient-record tools, calendar, laboratory requests, certificates, archives, and user management
+- Admin and Doctor accounts can assign or change User, Doctor, and Admin roles
+- Register and verify SHA-256 document hashes with a tamper-evident chained integrity ledger
+- Monitor timestamped audit activity, filter it, and generate printable/exportable audit reports
 - Create, Read (list + view), Update, Delete patient records
+- Archive inactive patient records without deleting them, and view or restore all old records
 - Search patients by name
 - Review complete previous patient record versions after edits
 - Create and print clinician-authored laboratory requests from a patient's consultation
@@ -48,6 +53,7 @@ real patient data.
 - The patient detail page contains a laboratory request form. Consultation/diagnosis and notes are prefilled as clinical context; the clinician enters the tests to request and can print the saved request.
 - Tests are selected by the clinician; the application does not infer or recommend tests. History is stored in the local database and is not blockchain-backed.
 - Re-import `database/health_records_db.sql` in phpMyAdmin to add the new tables to an existing installation. Existing patient data is not dropped.
+- Existing installations automatically receive the `archived_at` column when the application connects. If the database user cannot alter tables, run `ALTER TABLE patients ADD COLUMN archived_at TIMESTAMP NULL DEFAULT NULL AFTER notes;` in phpMyAdmin.
 - Schedule a face-to-face or follow-up appointment from a patient record. Appointments appear on the signed-in admin account's calendar, overlapping scheduled visits are rejected, and events can be marked completed or cancelled.
 - The calendar is internal to this application; it does not synchronize with Google Calendar or Outlook.
 - Generate a medical certificate draft from a patient record. Findings and recommendations are clinician-entered, and each printout states that it requires clinician verification and signature.
@@ -68,7 +74,8 @@ health_records/
 │   ├── auth_check.php      # login guard, include at top of protected pages
 │   ├── login.php
 │   ├── logout.php
-│   ├── dashboard.php       # READ: list + search
+│   ├── dashboard.php       # READ: active patient list + search
+│   ├── old_records.php     # READ: archived patient records
 │   ├── create.php          # CREATE
 │   ├── edit.php            # UPDATE
 │   ├── view.php            # READ: patient details, history, and lab requests
@@ -78,7 +85,7 @@ health_records/
 │   ├── calendar.php        # Account-specific appointment calendar
 │   ├── medical_certificate_create.php
 │   ├── medical_certificate.php
-│   ├── delete.php          # DELETE
+│   ├── archive.php         # ARCHIVE / RESTORE
 │   └── includes/
 │       ├── header.php
 │       └── footer.php

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/user_auth_check.php';
+require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/config/database.php';
 
 $userId = (int)$_SESSION['user_id'];

@@ -2,6 +2,11 @@
 require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/config/database.php';
 
+if (isset($_SESSION['admin_id'])) {
+    header('Location: admin/dashboard.php');
+    exit;
+}
+
 if (isset($_SESSION['user_id'])) {
     header('Location: dashboard.php');
     exit;
@@ -18,15 +23,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($identifier === '' || $password === '') {
         $error = 'Please enter your username/email and password.';
     } else {
-        $stmt = $pdo->prepare("SELECT id, username, email, password, status FROM users WHERE username = ? OR email = ? LIMIT 1");
+        $adminStmt = $pdo->prepare("SELECT id, username, password FROM admins WHERE username = ? LIMIT 1");
+        $adminStmt->execute([$identifier]);
+        $admin = $adminStmt->fetch();
+
+        if ($admin && password_verify($password, $admin['password'])) {
+            unset($_SESSION['user_id'], $_SESSION['user_username'], $_SESSION['user_email']);
+            $_SESSION['admin_id'] = (int)$admin['id'];
+            $_SESSION['admin_username'] = $admin['username'];
+            header('Location: admin/dashboard.php');
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT id, username, email, password, role, status FROM users WHERE username = ? OR email = ? LIMIT 1");
         $stmt->execute([$identifier, $identifier]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password']) && $user['status'] === 'Active') {
+            unset($_SESSION['admin_id'], $_SESSION['admin_username']);
             $_SESSION['user_id'] = (int)$user['id'];
             $_SESSION['user_username'] = $user['username'];
             $_SESSION['user_email'] = $user['email'];
-            header('Location: dashboard.php');
+            header('Location: ' . ($user['role'] === 'Doctor' ? 'admin/dashboard.php' : 'dashboard.php'));
             exit;
         }
 
@@ -48,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="text-center">
             <p class="text-success fw-semibold text-uppercase small mb-1">CareStash Health</p>
             <h1 class="h3 mb-2">Welcome back</h1>
-            <p class="text-muted mb-4">Sign in to view your health records and clinic updates.</p>
+            <p class="text-muted mb-4">Sign in to access your health records, clinic tools, or administration workspace.</p>
         </div>
 
         <?php if ($success): ?>
@@ -73,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="text-center mt-3">
             <p class="mb-2">New to CareStash? <a href="register.php">Create an account</a></p>
-            <a class="small text-decoration-none" href="admin/login.php">Administrator sign in</a>
+            <p class="small text-muted mb-0">Admin and Doctor accounts use this same sign-in.</p>
         </div>
     </main>
 </body>

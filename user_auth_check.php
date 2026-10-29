@@ -14,3 +14,10 @@ if ($stmt->fetchColumn() !== 'Active') {
     header('Location: login.php');
     exit;
 }
+
+$roleStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+$roleStmt->execute([(int)$_SESSION['user_id']]);
+if ($roleStmt->fetchColumn() === 'Doctor') {
+    header('Location: admin/dashboard.php');
+    exit;
+}

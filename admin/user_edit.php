@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id <= 0) {
@@ -19,6 +20,7 @@ if (!$user) {
 
 $page_title = 'Edit User';
 $errors = [];
+$canAssignRoles = in_array($_SESSION['staff_role'] ?? '', ['Admin', 'Doctor'], true);
 $linkStmt = $pdo->prepare("SELECT patient_id FROM patient_accounts WHERE user_id = ?");
 $linkStmt->execute([$id]);
 $linkedPatientId = $linkStmt->fetchColumn();
@@ -32,7 +34,7 @@ $patientsStmt = $pdo->prepare("
     SELECT p.id, p.full_name, p.date_of_birth
     FROM patients p
     LEFT JOIN patient_accounts pa ON pa.patient_id = p.id
-    WHERE pa.user_id IS NULL OR pa.user_id = ?
+    WHERE p.archived_at IS NULL AND (pa.user_id IS NULL OR pa.user_id = ?)
     ORDER BY p.full_name
 ");
 $patientsStmt->execute([$id]);
@@ -50,6 +52,12 @@ $form = [
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($form as $key => $default) {
         $form[$key] = trim($_POST[$key] ?? '');
+    }
+    if (!$canAssignRoles) {
+        $form['role'] = $user['role'];
+    }
+    if ($canAssignRoles && !in_array($form['role'], ['User', 'Doctor', 'Admin'], true)) {
+        $errors[] = 'Select a valid account role.';
     }
 
     if ($form['full_name'] === '') {
@@ -141,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $linkStmt->execute([$id, (int)$requestedPatientId]);
             }
             $pdo->commit();
+            audit_log($pdo, 'update_user', 'user', $id, 'Updated user account and role');
         } catch (Throwable $e) {
             $pdo->rollBack();
             throw $e;
@@ -187,11 +196,17 @@ include __DIR__ . '/includes/header.php';
             </div>
             <div class="col-md-2">
                 <label class="form-label">Role</label>
-                <select name="role" class="form-select">
+                <?php if (!$canAssignRoles): ?><input type="hidden" name="role" value="<?= htmlspecialchars($user['role']) ?>"><?php endif; ?>
+                <select name="role" class="form-select" <?= $canAssignRoles ? '' : 'disabled' ?>>
                     <option value="User" <?= $form['role'] === 'User' ? 'selected' : '' ?>>User</option>
-                    <option value="Admin" <?= $form['role'] === 'Admin' ? 'selected' : '' ?>>Admin</option>
-                    <option value="Doctor" <?= $form['role'] === 'Doctor' ? 'selected' : '' ?>>Doctor</option>
+                    <?php if ($canAssignRoles): ?>
+                        <option value="Admin" <?= $form['role'] === 'Admin' ? 'selected' : '' ?>>Admin</option>
+                        <option value="Doctor" <?= $form['role'] === 'Doctor' ? 'selected' : '' ?>>Doctor</option>
+                    <?php elseif ($form['role'] !== 'User'): ?>
+                        <option value="<?= htmlspecialchars($form['role']) ?>" selected><?= htmlspecialchars($form['role']) ?></option>
+                    <?php endif; ?>
                 </select>
+                <?php if (!$canAssignRoles): ?><div class="form-text">Only authorized staff can assign account roles.</div><?php endif; ?>
             </div>
             <div class="col-md-2">
                 <label class="form-label">Status</label>
